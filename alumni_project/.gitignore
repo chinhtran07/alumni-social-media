@@ -1,0 +1,31 @@
+# Django
+*.log
+*.pot
+*.pyc
+*.pyo
+__pycache__/
+db.sqlite3
+
+# Environment
+.env
+
+# Virtualenv
+venv/
+env/
+
+# MySQL
+*.sql
+*.db
+
+# Media
+media/
+
+# Static files
+static/
+
+# Local settings
+local_settings.py
+
+# IDEs
+.vscode/
+.idea/
