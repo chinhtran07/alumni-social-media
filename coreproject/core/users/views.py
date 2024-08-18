@@ -4,10 +4,12 @@ from django.db import transaction
 from django.shortcuts import render
 from rest_framework import viewsets, permissions, parsers, generics, status
 from rest_framework.decorators import action
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 import cloudinary.uploader
 
 from .serializers import *
+from ..core import settings
 
 
 # Create your views here.
@@ -161,11 +163,21 @@ class UserViewSet(viewsets.ViewSet, generics.RetrieveAPIView):
 
 class FriendRequestViewSet(viewsets.ViewSet,
                            generics.RetrieveAPIView,
-                           generics.ListAPIView,
                            generics.CreateAPIView):
     queryset = FriendRequest.objects.all()
     serializer_class = FriendRequestSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=False, methods=['get'], url_path='received-requests')
+    def received_requests(self, request):
+        received_requests = self.get_queryset().filter(receiver=request.user, pending=True)
+
+        paginator = PageNumberPagination()
+        paginator.page_size = 10
+        paginated_requests = paginator.paginate_queryset(received_requests, request)
+
+        serializer = FriendRequestSerializer(paginated_requests, many=True)
+        return  paginator.get_paginated_response(serializer.data)
 
     def create(self, request, *args, **kwargs):
         receiver_id = request.data.get('receiver')
@@ -187,7 +199,7 @@ class FriendRequestViewSet(viewsets.ViewSet,
                                     status=status.HTTP_400_BAD_REQUEST)
 
                     # Tạo yêu cầu kết bạn mới
-                friend_request = FriendRequest(sender=sender, receiver=receiver, pending=True)
+                friend_request = FriendRequest(sender=sender, receiver=receiver)
                 friend_request.save()
 
                 # Gửi thông báo thời gian thực
@@ -266,3 +278,4 @@ class FriendRequestViewSet(viewsets.ViewSet,
 
 class FriendshipViewSet(viewsets.ViewSet, generics.ListAPIView):
     queryset = Friendship.objects.all()
+    serializers
