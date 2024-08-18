@@ -1,5 +1,7 @@
 import json
-from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.generic.websocket import AsyncWebsocketConsumer, WebsocketConsumer
+
+from core.users import daos
 
 
 class NotificationConsumer(AsyncWebsocketConsumer):
@@ -35,3 +37,29 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'payload': event['payload']
         }))
+
+
+class UserActivityConsumer(WebsocketConsumer):
+    def connect(self):
+        self.accept()
+
+    def disconnect(self, code):
+        pass
+
+    def receive(self, text_data=None, bytes_data=None):
+        data = json.loads(text_data)
+        user_id = data.get('user_id')
+
+        self.send_activity_status_to_friends(user_id)
+
+    def send_activity_status_to_friends(self, user_id):
+        # Logic to get friends and send status
+        friends = self.get_friends(user_id)
+        for friend in friends:
+            self.send(text_data=json.dumps({
+                'user_id': user_id,
+                'status': 'active'
+            }))
+
+    def get_friends(self, user_id):
+        return daos.FriendshipDAO.get_friends(user_id)

@@ -2,6 +2,7 @@ from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.hashers import make_password, check_password
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.utils import timezone
 
 
 class User(AbstractUser):
@@ -28,6 +29,19 @@ class User(AbstractUser):
             self.password = make_password("123456")
         self.password = make_password(self.password)
         super().save(*args, **kwargs)
+
+
+class UserActivity(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    last_activity = models.DateTimeField(default=timezone.now)
+    is_active = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.is_active}"
+
+    class Meta:
+        verbose_name = 'User Activity'
+        verbose_name_plural = 'User Activities'
 
 
 class AlumniManager(BaseUserManager):
@@ -78,7 +92,6 @@ class Lecturer(User):
 
 
 class FriendRequest(models.Model):
-
     class Status(models.TextChoices):
         PENDING = "PENDING", "Pending"
         ACCEPTED = "ACCEPTED", "Accepted",
@@ -104,4 +117,3 @@ class Friendship(models.Model):
 
     def __str__(self):
         return f"{self.user1} <-> {self.user2}"
-

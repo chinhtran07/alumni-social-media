@@ -329,3 +329,15 @@ class FriendshipViewSet(viewsets.ViewSet, generics.ListAPIView):
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def send_activity_status(user_id):
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"user_{user_id}",
+        {
+            'type': 'send_activity_status',
+            'user_id': user_id,
+            'status': 'active'
+        }
+    )
