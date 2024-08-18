@@ -26,14 +26,7 @@ class User(AbstractUser):
     def save(self, *args, **kwargs):
         if not self.verified and self.role == User.Roles.LECTURER:
             self.password = make_password("123456")
-        if self.pk is not None:
-            original = User.objects.get(pk=self.pk)
-            if check_password(original.password, self.password):
-                # Hash the password if it has been updated
-                self.password = make_password(self.password)
-        else:
-            # Hash the password for new instances
-            self.password = make_password(self.password)
+        self.password = make_password(self.password)
         super().save(*args, **kwargs)
 
 
@@ -82,3 +75,27 @@ class Lecturer(User):
 
     class Meta:
         proxy = True
+
+
+class FriendRequest(models.Model):
+    sender = models.ForeignKey(User, related_name="sent_requests", on_delete=models.CASCADE)
+    receiver = models.ForeignKey(User, related_name="received_requests", on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    accepted = models.BooleanField(default=False)
+    rejected = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.sender} -> {self.receiver}"
+
+
+class Friendship(models.Model):
+    user1 = models.ForeignKey(User, related_name='friendship_user1', on_delete=models.CASCADE)
+    user2 = models.ForeignKey(User, related_name='friendship_user2', on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user1', 'user2')
+
+    def __str__(self):
+        return f"{self.user1} <-> {self.user2}"
+

@@ -4,8 +4,6 @@ from .models import *
 
 
 class UserSerializer(serializers.ModelSerializer):
-    avatar = serializers.ImageField(required=True, write_only=True)
-
     class Meta:
         model = User
         fields = ['username', 'email', 'first_name', 'last_name', 'phone_number', 'role',
@@ -42,3 +40,27 @@ class LecturerSerializer(UserSerializer):
     class Meta(UserSerializer.Meta):
         model = Lecturer
         fields = UserSerializer.Meta.fields + ['more']
+
+
+class UserFriendRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'first_name', 'last_name', 'avatar']
+
+
+class FriendRequestSerializer(serializers.ModelSerializer):
+    sender = UserFriendRequestSerializer()
+    receiver = UserFriendRequestSerializer()
+
+    class Meta:
+        model = FriendRequest
+        fields = ['id', 'sender', 'receiver', 'created_at', 'accepted', 'rejected']
+
+
+class FriendshipSerializer(serializers.ModelSerializer):
+    user1 = UserFriendRequestSerializer()
+    user2 = UserFriendRequestSerializer()
+
+    class Meta:
+        model = Friendship
+        fields = ['id', 'user1', 'user2', 'created_at']

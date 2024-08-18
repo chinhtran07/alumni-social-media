@@ -1,3 +1,5 @@
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from django.db import transaction
 from django.shortcuts import render
 from rest_framework import viewsets, permissions, parsers, generics, status
@@ -155,3 +157,79 @@ class UserViewSet(viewsets.ViewSet, generics.RetrieveAPIView):
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class FriendRequestViewSet(viewsets.ViewSet,
+                           generics.RetrieveAPIView,
+                           generics.ListAPIView,
+                           generics.CreateAPIView):
+    queryset = FriendRequest.objects.all()
+    serializer_class = FriendRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        receiver_id = request.data.get('receiver')
+
+        try:
+            sender = request.user
+            receiver = User.objects.get(id=receiver_id)
+        except Exception as e:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            with transaction.atomic():
+                if FriendRequest.objects.filter(sender=sender, receiver=receiver).exists():
+                    return Response({'error': 'Friend request already sent'}, status=status.HTTP_400_BAD_REQUEST)
+
+                friend_request = FriendRequest(sender=sender, receiver=receiver)
+                friend_request.save()
+
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{friend_request.receiver.id}",
+                    {
+                        'type': 'send_notification',
+                        'payload': {
+                            'friend_request_id': friend_request.id,
+                            'sender_id': friend_request.sender.id ,
+                            'message': f"You have a new friend request"
+                        }
+                    }
+                )
+                return Response({'status': 'Request sent'}, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'])
+    def accept(self, request, pk=None):
+        request_instance = self.get_object()
+        if request_instance.accepted or request_instance.rejected:
+            return Response({'detail': 'Request already processed'}, status=status.HTTP_400_BAD_REQUEST)
+
+        request_instance.accepted = True
+        request_instance.save()
+
+        Friendship.objects.create(user1=request_instance.sender, user2=request_instance.receiver)
+
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"user_{request_instance.sender.id}",
+            {
+                'type': 'send_notification',
+                'payload': {
+                    'message': f"Your friend request to {request_instance.receiver.username} has been accepted",
+                }
+            }
+        )
+
+        return Response({'status': 'Request accepted'}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        request_instance = self.get_object()
+        if request_instance.accepted or request_instance.rejected:
+            return Response({'detail': 'Request already processed'}, status=status.HTTP_400_BAD_REQUEST)
+
+        request_instance.rejected = True
+        request_instance.save()
+        return Response({'status': 'Request rejected'}, status=status.HTTP_200_OK)

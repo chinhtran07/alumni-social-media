@@ -12,6 +12,9 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 
+import pymysql
+pymysql.install_as_MySQLdb()
+
 import os
 from dotenv import load_dotenv
 
@@ -49,8 +52,20 @@ INSTALLED_APPS = [
     'cloudinary',
     'ckeditor',
     'ckeditor_uploader',
-    'debug_toolbar'
+    'debug_toolbar',
+    'channels'
 ]
+
+ASGI_APPLICATION = 'core.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],  # Địa chỉ Redis server
+        },
+    },
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
