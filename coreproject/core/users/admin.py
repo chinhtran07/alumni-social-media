@@ -16,6 +16,11 @@ class FriendRequestAdmin(admin.ModelAdmin):
     list_display = ['id']
 
 
+class FriendshipAdmin(admin.ModelAdmin):
+    list_display = ['id', 'user1', 'user2']
+    search_fields = ['user1', 'user2']
+
+
 admin.site.register(User, UserAdmin)
 admin.site.register(FriendRequest, FriendRequestAdmin)
-
+admin.site.register(Friendship, FriendshipAdmin)

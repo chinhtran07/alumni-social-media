@@ -206,4 +206,7 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
 
 
+#redis
 #daphne -p 8000 core.asgi:application
+#celery
+# celery -A core worker --loglevel=info
