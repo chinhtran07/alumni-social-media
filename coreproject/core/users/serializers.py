@@ -42,15 +42,15 @@ class LecturerSerializer(UserSerializer):
         fields = UserSerializer.Meta.fields + ['more']
 
 
-class UserFriendRequestSerializer(serializers.ModelSerializer):
+class UserFriendSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'avatar']
 
 
 class FriendRequestSerializer(serializers.ModelSerializer):
-    sender = UserFriendRequestSerializer()
-    receiver = UserFriendRequestSerializer()
+    sender = UserFriendSerializer()
+    receiver = UserFriendSerializer()
 
     class Meta:
         model = FriendRequest
@@ -58,8 +58,8 @@ class FriendRequestSerializer(serializers.ModelSerializer):
 
 
 class FriendshipSerializer(serializers.ModelSerializer):
-    user1 = UserFriendRequestSerializer()
-    user2 = UserFriendRequestSerializer()
+    user1 = UserFriendSerializer()
+    user2 = UserFriendSerializer()
 
     class Meta:
         model = Friendship

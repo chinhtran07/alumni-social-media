@@ -1,6 +1,7 @@
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import render
 from rest_framework import viewsets, permissions, parsers, generics, status
 from rest_framework.decorators import action
@@ -9,7 +10,6 @@ from rest_framework.response import Response
 import cloudinary.uploader
 
 from .serializers import *
-from ..core import settings
 
 
 # Create your views here.
@@ -170,7 +170,7 @@ class FriendRequestViewSet(viewsets.ViewSet,
 
     @action(detail=False, methods=['get'], url_path='received-requests')
     def received_requests(self, request):
-        received_requests = self.get_queryset().filter(receiver=request.user, pending=True)
+        received_requests = self.get_queryset().filter(receiver=request.user, status=FriendRequest.Status.PENDING)
 
         paginator = PageNumberPagination()
         paginator.page_size = 10
@@ -215,7 +215,7 @@ class FriendRequestViewSet(viewsets.ViewSet,
         if request_instance.accepted or request_instance.rejected:
             return Response({'detail': 'Request already processed'}, status=status.HTTP_400_BAD_REQUEST)
 
-        request_instance.accepted = True
+        request_instance.status = FriendRequest.Status.ACCEPTED
         request_instance.save()
 
         Friendship.objects.create(user1=request_instance.sender, user2=request_instance.receiver)
@@ -239,18 +239,17 @@ class FriendRequestViewSet(viewsets.ViewSet,
         if request_instance.accepted or request_instance.rejected:
             return Response({'detail': 'Request already processed'}, status=status.HTTP_400_BAD_REQUEST)
 
-        request_instance.rejected = True
+        request_instance.status = FriendRequest.Status.REJECTED
         request_instance.save()
         return Response({'status': 'Request rejected'}, status=status.HTTP_200_OK)
 
     def handle_rejected_request(self, sender, receiver):
         rejected_request = FriendRequest.objects.filter(
-            sender=sender, receiver=receiver, rejected=True
+            sender=sender, receiver=receiver, status=FriendRequest.Status.REJECTED
         ).first()
 
         if rejected_request:
-            rejected_request.rejected = False
-            rejected_request.pending = True
+            rejected_request.status = FriendRequest.Status.PENDING
             rejected_request.save()
 
             # Gửi thông báo thời gian thực
@@ -259,7 +258,7 @@ class FriendRequestViewSet(viewsets.ViewSet,
         return False
 
     def is_request_pending(self, sender, receiver):
-        return FriendRequest.objects.filter(sender=sender, receiver=receiver, pending=True).exists()
+        return FriendRequest.objects.filter(sender=sender, receiver=receiver, status=FriendRequest.Status.PENDING).exists()
 
     def send_notification(self, friend_request):
         channel_layer = get_channel_layer()
@@ -278,4 +277,54 @@ class FriendRequestViewSet(viewsets.ViewSet,
 
 class FriendshipViewSet(viewsets.ViewSet, generics.ListAPIView):
     queryset = Friendship.objects.all()
-    serializers
+    permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=False, methods=['get'], url_path='friends')
+    def list_friends(self, request):
+        user = request.user
+
+        friends = User.objects.filter(
+            id__in =Friendship.objects.filter(user1=user).value('user2')
+        ) | User.objects.filter(
+            id__in=Friendship.objects.filter(user2=user).values('user1')
+        )
+
+        paginator = PageNumberPagination()
+        paginator.page_size = 10
+        paginated_friends = paginator.paginate_queryset(friends, request)
+
+        serializer = UserSerializer(paginated_friends, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
+    @action(detail=False, methods=['post'], url_path='unfriend')
+    def unfriend(self, request):
+        try:
+            user_id_to_unfriend = request.data.get('user_id')
+            if not user_id_to_unfriend:
+                return Response({'error': 'User ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            user_to_unfriend = User.objects.get(id=user_id_to_unfriend)
+
+            friendship = Friendship.objects.filter(
+                (Q(user1=request.user, user2=user_to_unfriend) | Q(user1=user_to_unfriend, user2=request.user))
+            ).first()
+
+            if not friendship:
+                return Response({'error': 'Friendship does not exist'}, status=status.HTTP_404_NOT_FOUND)
+
+            friendship.delete()
+
+            friend_request = FriendRequest.objects.filter(
+                Q(sender=request.user, receiver=user_to_unfriend) |
+                Q(sender=user_to_unfriend, receiver=request.user)
+            ).first()
+
+            if friend_request:
+                friend_request.status = FriendRequest.Status.REJECTED
+                friend_request.save()
+
+            return Response({'status': 'Unfriended and request status updated successfully'}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

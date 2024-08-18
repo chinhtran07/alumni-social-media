@@ -196,3 +196,6 @@ cloudinary.config(
 
 CLIENT_ID = os.getenv('CLIENT_ID')
 CLIENT_SECRET = os.getenv('CLIENT_SECRET')
+
+
+#daphne -p 8000 core.asgi:application

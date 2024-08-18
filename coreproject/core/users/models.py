@@ -78,12 +78,17 @@ class Lecturer(User):
 
 
 class FriendRequest(models.Model):
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        ACCEPTED = "ACCEPTED", "Accepted",
+        REJECTED = "REJECTED", "Rejected"
+
     sender = models.ForeignKey(User, related_name="sent_requests", on_delete=models.CASCADE)
     receiver = models.ForeignKey(User, related_name="received_requests", on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
-    accepted = models.BooleanField(default=False)
-    rejected = models.BooleanField(default=False)
-    pending = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
 
     def __str__(self):
         return f"{self.sender} -> {self.receiver}"
