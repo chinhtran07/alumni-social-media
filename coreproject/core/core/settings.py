@@ -146,8 +146,11 @@ CKEDITOR_UPLOAD_PATH = 'ckeditor/images/'
 
 OAUTH2_PROVIDER = {
     'OAUTH2_BACKEND_CLASS': 'oauth2_provider.oauth2_backends.JSONOAuthLibCore',
+    'ACCESS_TOKEN_EXPIRE_SECONDS': 36000,
+    'REFRESH_TOKEN_EXPIRE_SECONDS': 1209600,
+    'SCOPES': {'read': 'Read scope', 'write': 'Write scope'},
+    'ALLOWED_GRANT_TYPES': ['password', 'authorization_code', 'refresh_token', 'client_credentials'],
 }
-
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -170,8 +173,10 @@ AUTHENTICATION_BACKENDS = (
 import cloudinary
 
 cloudinary.config(
-    cloud_name=os.getenv('CLOUD_NAME'),
+    cloud_name=os.getenv('CLOUDINARY_NAME'),
     api_key=os.getenv('CLOUDINARY_API_KEY'),
     api_secret=os.getenv('CLOUDINARY_SECRET')
 )
 
+CLIENT_ID = os.getenv('CLIENT_ID')
+CLIENT_SECRET = os.getenv('CLIENT_SECRET')

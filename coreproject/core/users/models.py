@@ -1,4 +1,5 @@
 from django.contrib.auth.base_user import BaseUserManager
+from django.contrib.auth.hashers import make_password, check_password
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
@@ -21,6 +22,19 @@ class User(AbstractUser):
 
     def __str__(self):
         return f'{self.get_full_name()} - {self.role}'
+
+    def save(self, *args, **kwargs):
+        if not self.verified and self.role == User.Roles.LECTURER:
+            self.password = make_password("123456")
+        if self.pk is not None:
+            original = User.objects.get(pk=self.pk)
+            if check_password(original.password, self.password):
+                # Hash the password if it has been updated
+                self.password = make_password(self.password)
+        else:
+            # Hash the password for new instances
+            self.password = make_password(self.password)
+        super().save(*args, **kwargs)
 
 
 class AlumniManager(BaseUserManager):
