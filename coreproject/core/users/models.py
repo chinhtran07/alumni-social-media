@@ -83,6 +83,7 @@ class FriendRequest(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     accepted = models.BooleanField(default=False)
     rejected = models.BooleanField(default=False)
+    pending = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.sender} -> {self.receiver}"

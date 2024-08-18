@@ -174,28 +174,25 @@ class FriendRequestViewSet(viewsets.ViewSet,
             sender = request.user
             receiver = User.objects.get(id=receiver_id)
         except Exception as e:
-            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': str(e)}, status=status.HTTP_404_NOT_FOUND)
 
         try:
             with transaction.atomic():
-                if FriendRequest.objects.filter(sender=sender, receiver=receiver).exists():
-                    return Response({'error': 'Friend request already sent'}, status=status.HTTP_400_BAD_REQUEST)
+                if self.handle_rejected_request(sender, receiver):
+                    return Response({'status': 'Request resent and is now pending'}, status=status.HTTP_200_OK)
 
-                friend_request = FriendRequest(sender=sender, receiver=receiver)
+                    # Kiểm tra nếu có yêu cầu pending
+                if self.is_request_pending(sender, receiver):
+                    return Response({'error': 'Friend request already sent and pending'},
+                                    status=status.HTTP_400_BAD_REQUEST)
+
+                    # Tạo yêu cầu kết bạn mới
+                friend_request = FriendRequest(sender=sender, receiver=receiver, pending=True)
                 friend_request.save()
 
-                channel_layer = get_channel_layer()
-                async_to_sync(channel_layer.group_send)(
-                    f"user_{friend_request.receiver.id}",
-                    {
-                        'type': 'send_notification',
-                        'payload': {
-                            'friend_request_id': friend_request.id,
-                            'sender_id': friend_request.sender.id ,
-                            'message': f"You have a new friend request"
-                        }
-                    }
-                )
+                # Gửi thông báo thời gian thực
+                self.send_notification(friend_request)
+
                 return Response({'status': 'Request sent'}, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -233,3 +230,39 @@ class FriendRequestViewSet(viewsets.ViewSet,
         request_instance.rejected = True
         request_instance.save()
         return Response({'status': 'Request rejected'}, status=status.HTTP_200_OK)
+
+    def handle_rejected_request(self, sender, receiver):
+        rejected_request = FriendRequest.objects.filter(
+            sender=sender, receiver=receiver, rejected=True
+        ).first()
+
+        if rejected_request:
+            rejected_request.rejected = False
+            rejected_request.pending = True
+            rejected_request.save()
+
+            # Gửi thông báo thời gian thực
+            self.send_notification(rejected_request)
+            return True
+        return False
+
+    def is_request_pending(self, sender, receiver):
+        return FriendRequest.objects.filter(sender=sender, receiver=receiver, pending=True).exists()
+
+    def send_notification(self, friend_request):
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"user_{friend_request.receiver.id}",
+            {
+                'type': 'send_notification',
+                'payload': {
+                    'friend_request_id': friend_request.id,
+                    'sender_id': friend_request.sender.id,
+                    'message': "You have a new friend request"
+                }
+            }
+        )
+
+
+class FriendshipViewSet(viewsets.ViewSet, generics.ListAPIView):
+    queryset = Friendship.objects.all()
