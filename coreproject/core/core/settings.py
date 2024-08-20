@@ -45,7 +45,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'users.apps.UsersConfig',
+    'posts.apps.PostsConfig',
     'rest_framework',
+    'django_filters',
     'drf_yasg',
     'oauth2_provider',
     'corsheaders',
@@ -55,6 +57,10 @@ INSTALLED_APPS = [
     'debug_toolbar',
     'channels'
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
+}
 
 ASGI_APPLICATION = 'core.asgi.application'
 
@@ -206,7 +212,7 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
 
 
-#redis
+#redis - notification
 #daphne -p 8000 core.asgi:application
-#celery
+#celery - run task
 # celery -A core worker --loglevel=info

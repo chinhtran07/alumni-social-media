@@ -3,13 +3,17 @@ from channels.layers import get_channel_layer
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import render
-from rest_framework import viewsets, permissions, parsers, generics, status
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import viewsets, permissions, parsers, generics, status, filters
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 import cloudinary.uploader
 
 from .serializers import *
+from posts.models import Post
+
+from posts.serializers import PostSerializer
 
 
 # Create your views here.
@@ -19,6 +23,8 @@ class UserViewSet(viewsets.ViewSet, generics.RetrieveAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     parser_classes = [parsers.MultiPartParser]
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter)
+    search_fields = ['first_name', 'last_name']
     permission_classes = [permissions.IsAuthenticated()]
 
     def get_permissions(self):
@@ -57,7 +63,7 @@ class UserViewSet(viewsets.ViewSet, generics.RetrieveAPIView):
         data = request.data
         password = data.get('password')
         if not password:
-            return Response({"error": "Password is required"}, status=status)
+            return Response({"error": "Password is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             with transaction.atomic():
@@ -190,6 +196,26 @@ class UserViewSet(viewsets.ViewSet, generics.RetrieveAPIView):
                 return Response({'status': 'Request sent'}, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'], url_path='posts')
+    def add_post(self, request):
+        data = request.data
+        try:
+            with transaction.atomic():
+                media = data.get('media')
+                res = cloudinary.uploader.upload(media, folder='posts/')
+                post = Post.objects.create(
+                    title=data.get('title'),
+                    content=data.get('content'),
+                    media = res['secure_url'],
+                    author=request.user
+                )
+
+                serializer = PostSerializer(post)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
     def handle_rejected_request(self, sender, receiver):
         rejected_request = FriendRequest.objects.filter(
